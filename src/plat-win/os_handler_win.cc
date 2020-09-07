@@ -132,12 +132,12 @@ class OsHandleWin : public OsHandler {
     auto java_home_path_string = intl::utf8ToSystem(java_home_path);
 
     if (!jvm_dll_path_string.empty()) {
-      return dso_handle->open(jvm_dll_path_string.c_str());
+      return dso_handle->opent(jvm_dll_path_string.c_str());
     } else if (!java_home_path_string.empty()) {
       return loadJvmFromJavaHome(dso_handle, java_home_path_string.c_str());
     } else {
       TCHAR env_java_home[MAX_PATH];
-      if (::GetEnvironmentVariable("JAVA_HOME", env_java_home, MAX_PATH) > 0) {
+      if (::GetEnvironmentVariable(_T("JAVA_HOME"), env_java_home, MAX_PATH) > 0) {
         if (loadJvmFromJavaHome(dso_handle, env_java_home) == 0) {
           return 0;
         }
