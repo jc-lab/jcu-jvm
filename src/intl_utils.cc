@@ -29,7 +29,7 @@ std::basic_string<system_char_t> utf8ToSystem(const char* text, int length) {
   if (length < 0) {
     return s_utf8_to_wstr_convert.from_bytes(text);
   } else {
-    return s_utf8_to_wstr_convert.from_bytes(text, length);
+    return s_utf8_to_wstr_convert.from_bytes(text, text + length);
   }
 }
 std::string systemToUtf8(const system_char_t* text, int length) {
@@ -40,7 +40,7 @@ std::string systemToUtf8(const system_char_t* text, int length) {
   if (length < 0) {
     return s_utf8_to_wstr_convert.to_bytes(text);
   } else {
-    return s_utf8_to_wstr_convert.to_bytes(text, length);
+    return s_utf8_to_wstr_convert.to_bytes(text, text + length);
   }
 }
 #else

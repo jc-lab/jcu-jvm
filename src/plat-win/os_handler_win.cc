@@ -50,7 +50,7 @@ class DsoHandleWin : public DsoHandle {
     handle_ = ::LoadLibrary(path);
     if (!handle_) {
       DWORD eno = ::GetLastError();
-      std::vector<char> errmsgbuf(1024);
+      std::vector<TCHAR> errmsgbuf(1024);
       DWORD errchars = FormatMessage(
           FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_IGNORE_INSERTS,
           nullptr,
