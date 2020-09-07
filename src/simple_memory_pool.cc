@@ -15,6 +15,10 @@ namespace jcu {
 namespace jvm {
 namespace intl {
 
+MemoryPool* createSimpleMemoryPool() {
+  return new SimpleMemoryPool();
+}
+
 SimpleMemoryPool::SimpleMemoryPool() {
 }
 

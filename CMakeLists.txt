@@ -39,6 +39,7 @@ set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(SRC_FILES
         ${INC_DIR}/os_handler.h
         ${INC_DIR}/jvm_library.h
+        ${INC_DIR}/memory_pool.h
         ${SRC_DIR}/intl_utils.h
         ${SRC_DIR}/intl_utils.cc
         ${INC_DIR}/vm.h

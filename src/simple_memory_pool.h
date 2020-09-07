@@ -12,11 +12,13 @@
 
 #include <set>
 
+#include <jcu-jvm/memory_pool.h>
+
 namespace jcu {
 namespace jvm {
 namespace intl {
 
-class SimpleMemoryPool {
+class SimpleMemoryPool : public MemoryPool {
  private:
   std::set<void*> allocated_ptrs_;
 
@@ -24,9 +26,9 @@ class SimpleMemoryPool {
   SimpleMemoryPool();
   ~SimpleMemoryPool();
 
-  void* allocate(size_t size);
-  bool release(void *ptr);
-  void releaseAll();
+  void* allocate(size_t size) override;
+  bool release(void *ptr) override;
+  void releaseAll() override;
 };
 
 } // namespace intl

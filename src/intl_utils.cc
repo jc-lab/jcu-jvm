@@ -67,7 +67,7 @@ std::string systemToUtf8(const system_char_t* text, int length) {
 }
 #endif
 
-char* mpollStrdup(SimpleMemoryPool* pool, const char* text) {
+char* mpollStrdup(MemoryPool* pool, const char* text) {
   size_t length = strlen(text);
   char* buf = (char*)pool->allocate(length + 1);
   memcpy(buf, text, length);

@@ -19,6 +19,8 @@ typedef char system_char_t;
 
 #include <string>
 
+#include <jcu-jvm/memory_pool.h>
+
 namespace jcu {
 namespace jvm {
 namespace intl {
@@ -38,7 +40,7 @@ std::basic_string<T> stringReplace(std::basic_string<T> input, const std::basic_
   return input;
 }
 
-char* mpollStrdup(SimpleMemoryPool* pool, const char* text);
+char* mpollStrdup(MemoryPool* pool, const char* text);
 
 } // namespace intl
 } // namespace jvm
