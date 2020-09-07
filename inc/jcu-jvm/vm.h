@@ -26,6 +26,10 @@ class VM {
 
   virtual void callExit(jint code) = 0;
 
+  virtual jint attachThread(bool* attached) = 0;
+  virtual jint attachThreadEnv(JNIEnv** env, bool* attached) = 0;
+  virtual jint detachThread() = 0;
+
   static VM* create(PointerRef<JvmLibrary> jvm_library);
 };
 

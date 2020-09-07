@@ -43,6 +43,7 @@ class VMImpl : public VM {
 
   JavaVM* jvm_;
   JNIEnv* env_;
+  jint jni_ver_;
 
   jclass cls_system_;
 
@@ -60,6 +61,7 @@ class VMImpl : public VM {
     jvm_ = nullptr;
     env_ = nullptr;
     cls_system_ = nullptr;
+    jni_ver_ = 0;
   }
 
   jint init() override {
@@ -72,6 +74,7 @@ class VMImpl : public VM {
 
     init_args.version = JNI_VERSION_1_8;
     init_args.ignoreUnrecognized = JNI_TRUE;
+    jni_ver_ = init_args.version;
 
     init_args.nOptions = 5;
     init_args.options = (JavaVMOption*)regional_pool.allocate(sizeof(JavaVMOption) * init_args.nOptions);
@@ -134,6 +137,29 @@ class VMImpl : public VM {
   }
   virtual JNIEnv* env() const override {
     return env_;
+  }
+
+  jint attachThread(bool* attached) override {
+    return attachThreadEnv(&env_, attached);
+  }
+
+  jint attachThreadEnv(JNIEnv** env, bool* attached) override {
+    jint rc = jvm_->GetEnv((void**)env, jni_ver_);
+    if (rc != JNI_OK) {
+      if (rc == JNI_EDETACHED) {
+        rc = jvm_->AttachCurrentThread((void**)env, nullptr);
+        if (attached) *attached = true;
+      }
+    }
+    if (rc != JNI_OK) {
+      *env = nullptr;
+      return false;
+    }
+    return rc;
+  }
+
+  jint detachThread() override {
+    return jvm_->DetachCurrentThread();
   }
 };
 
