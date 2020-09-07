@@ -64,47 +64,81 @@ class VMImpl : public VM {
     jni_ver_ = 0;
   }
 
-  jint init() override {
-    intl::SimpleMemoryPool regional_pool;
+  jint init(const char* classpath, const JavaVMInitArgs* custom_init_args, MemoryPool* mpool) override {
+    std::unique_ptr<intl::SimpleMemoryPool> allocated_pool;
     JavaVMInitArgs init_args = { 0 };
     int opt;
     jint rc;
 
     destroy();
 
-    init_args.version = JNI_VERSION_1_8;
-    init_args.ignoreUnrecognized = JNI_TRUE;
-    jni_ver_ = init_args.version;
+    if (!mpool) {
+      allocated_pool.reset(new intl::SimpleMemoryPool());
+      mpool = allocated_pool.get();
+    }
 
     init_args.nOptions = 5;
-    init_args.options = (JavaVMOption*)regional_pool.allocate(sizeof(JavaVMOption) * init_args.nOptions);
+
+    if (classpath) {
+      init_args.nOptions++;
+    }
+    if (custom_init_args) {
+      init_args.version = custom_init_args->version;
+      init_args.nOptions += custom_init_args->nOptions;
+    }
+    if (!init_args.version) {
+      init_args.version = JNI_VERSION_1_8;
+    }
+
+    jvm_library_->JNI_GetDefaultJavaVMInitArgs((void*)&init_args);
+    init_args.ignoreUnrecognized = JNI_TRUE;
+
+    jni_ver_ = init_args.version;
+
+    init_args.options = (JavaVMOption*)mpool->allocate(sizeof(JavaVMOption) * init_args.nOptions);
 
     opt = 0;
+    if (custom_init_args) {
+      for (int i = 0; i < custom_init_args->nOptions; i++) {
+        JavaVMOption* item = &init_args.options[opt++];
+        const JavaVMOption* src = &custom_init_args->options[i];
+        item->optionString = intl::mpollStrdup(mpool, src->optionString);
+        item->extraInfo = (void*)src->extraInfo;
+      }
+    }
+    if (classpath) {
+      JavaVMOption* item = &init_args.options[opt++];
+      std::string temp;
+      temp = "-Djava.class.path=";
+      temp.append(classpath);
+      item->optionString = intl::mpollStrdup(mpool, temp.c_str());
+      item->extraInfo = nullptr;
+    }
     {
       JavaVMOption* item = &init_args.options[opt++];
-      item->optionString = intl::mpollStrdup(&regional_pool, "exit");
+      item->optionString = intl::mpollStrdup(mpool, "exit");
       item->extraInfo = (void*)_java_exit;
     }
     {
       JavaVMOption* item = &init_args.options[opt++];
-      item->optionString = intl::mpollStrdup(&regional_pool, "abort");
+      item->optionString = intl::mpollStrdup(mpool, "abort");
       item->extraInfo = (void*)_java_abort123;
     }
     {
       JavaVMOption* item = &init_args.options[opt++];
-      item->optionString = intl::mpollStrdup(&regional_pool, "vfprintf");
+      item->optionString = intl::mpollStrdup(mpool, "vfprintf");
       item->extraInfo = (void*)_java_vfprintf;
     }
     {
       JavaVMOption* item = &init_args.options[opt++];
-      char* buffer = (char*)regional_pool.allocate(128);
+      char* buffer = (char*)mpool->allocate(128);
       snprintf(buffer, 128, "-Djcu.jvm.process.ppid=%d", os_handler_->getParentPid());
       item->optionString = buffer;
       item->extraInfo = (void*) nullptr;
     }
     {
       JavaVMOption* item = &init_args.options[opt++];
-      char* buffer = (char*)regional_pool.allocate(128);
+      char* buffer = (char*)mpool->allocate(128);
       snprintf(buffer, 128, "-Djcu.jvm.process.pid=%d", os_handler_->getCurrentPid());
       item->optionString = buffer;
       item->extraInfo = (void*) nullptr;

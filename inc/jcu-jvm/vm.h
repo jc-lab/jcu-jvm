@@ -12,13 +12,14 @@
 
 #include "pointer_ref.h"
 #include "jvm_library.h"
+#include "memory_pool.h"
 
 namespace jcu {
 namespace jvm {
 
 class VM {
  public:
-  virtual jint init() = 0;
+  virtual jint init(const char* classpath, const JavaVMInitArgs* init_args = nullptr, MemoryPool* mpool = nullptr) = 0;
   virtual jint destroy() = 0;
 
   virtual JavaVM* jvm() const = 0;
