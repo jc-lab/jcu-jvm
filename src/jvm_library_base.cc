@@ -16,7 +16,7 @@ namespace jvm {
 class JvmLibraryBase : public JvmLibrary {
  private:
   PointerRef<OsHandler> os_handler_;
-  std::unique_ptr<DsoHandle> dso_handle_;
+  PointerRef<DsoHandle> dso_handle_;
 
   int load_errno_;
   std::string load_error_;
@@ -46,8 +46,6 @@ class JvmLibraryBase : public JvmLibrary {
   JvmLibraryBase(PointerRef<OsHandler> &&os_handler)
       : load_errno_(0), os_handler_(std::move(os_handler))
   {
-    dso_handle_.reset(os_handler_->createDsoHandle());
-
     fnJNI_GetDefaultJavaVMInitArgs_ = nullptr;
     fnJNI_CreateJavaVM_ = nullptr;
     fnJNI_GetCreatedJavaVMs_ = nullptr;
@@ -63,7 +61,9 @@ class JvmLibraryBase : public JvmLibrary {
   }
 
   void close() {
-    dso_handle_->close();
+    if (dso_handle_) {
+      dso_handle_->close();
+    }
     fnJNI_GetDefaultJavaVMInitArgs_ = nullptr;
     fnJNI_CreateJavaVM_ = nullptr;
     fnJNI_GetCreatedJavaVMs_ = nullptr;
@@ -71,7 +71,7 @@ class JvmLibraryBase : public JvmLibrary {
   }
 
   bool isLoaded() const override {
-    return dso_handle_->isLoaded();
+    return dso_handle_ && dso_handle_->isLoaded();
   }
 
   int getLoadErrno() const override {
@@ -83,18 +83,37 @@ class JvmLibraryBase : public JvmLibrary {
   }
 
   const char* getJvmPath() const override {
-    return dso_handle_->getPath();
+    return dso_handle_ ? dso_handle_->getPath() : nullptr;
   }
 
-  int load(const char* jvm_dll_path = nullptr, const char* java_home_path = nullptr) {
-    os_handler_->loadJvmLibrary(dso_handle_.get(), jvm_dll_path, java_home_path);
-    if (dso_handle_->isLoaded()) {
-      fnJNI_GetDefaultJavaVMInitArgs_ = (fnJNI_GetDefaultJavaVMInitArgs_t)dso_handle_->getProc("JNI_GetDefaultJavaVMInitArgs");
-      fnJNI_CreateJavaVM_ = (fnJNI_CreateJavaVM_t)dso_handle_->getProc("JNI_CreateJavaVM");
-      fnJNI_GetCreatedJavaVMs_ = (fnJNI_GetCreatedJavaVMs_t)dso_handle_->getProc("JNI_GetCreatedJavaVMs");
-      fnJVM_DumpAllStacks_ = (fnJVM_DumpAllStacks_t)dso_handle_->getProc("JVM_DumpAllStacks");
+  int load(const JvmLibraryPathInfo& path_info, bool jsig_load = false) {
+    int rc;
+    PointerRef<DsoHandle> dso_handle;
+    dso_handle = std::unique_ptr<DsoHandle>(os_handler_->createDsoHandle());
+
+    if (jsig_load) {
+      PointerRef<DsoHandle> jsig_handle;
+      jsig_handle = std::unique_ptr<DsoHandle>(os_handler_->createDsoHandle());
+      rc = jsig_handle->open(path_info.jsig_path.c_str());
+      if (rc) {
+        return rc;
+      }
+      dso_handle->addDependency(std::move(jsig_handle));
     }
-    return dso_handle_->getErrno();
+
+    rc = dso_handle->open(path_info.jvm_path.c_str());
+    if (rc) {
+      return rc;
+    }
+
+    dso_handle_ = std::move(dso_handle);
+
+    fnJNI_GetDefaultJavaVMInitArgs_ = (fnJNI_GetDefaultJavaVMInitArgs_t)dso_handle_->getProc("JNI_GetDefaultJavaVMInitArgs");
+    fnJNI_CreateJavaVM_ = (fnJNI_CreateJavaVM_t)dso_handle_->getProc("JNI_CreateJavaVM");
+    fnJNI_GetCreatedJavaVMs_ = (fnJNI_GetCreatedJavaVMs_t)dso_handle_->getProc("JNI_GetCreatedJavaVMs");
+    fnJVM_DumpAllStacks_ = (fnJVM_DumpAllStacks_t)dso_handle_->getProc("JVM_DumpAllStacks");
+
+    return 0;
   }
 };
 

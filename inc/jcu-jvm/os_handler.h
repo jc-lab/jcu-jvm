@@ -12,12 +12,15 @@
 
 #include <string>
 
+#include "pointer_ref.h"
+
 namespace jcu {
 namespace jvm {
 
 class DsoHandle {
  public:
   virtual ~DsoHandle() = default;
+  virtual void addDependency(PointerRef<DsoHandle>&& handle) = 0;
   virtual int open(const char* path) = 0;
   virtual bool isLoaded() const = 0;
   virtual int getErrno() const = 0;
@@ -27,12 +30,20 @@ class DsoHandle {
   virtual const char* getPath() const = 0;
 };
 
+struct JvmLibraryPathInfo {
+  std::string java_home;
+  std::string jvm_path;
+  std::string jsig_path;
+};
+
 class OsHandler {
  public:
   virtual ~OsHandler() = default;
 
+  virtual JvmLibraryPathInfo findJvmLibrary(const char* jvm_dll_path = nullptr, const char* java_home_path = nullptr) const = 0;
+
   virtual DsoHandle* createDsoHandle() const = 0;
-  virtual DsoHandle* loadJvmLibrary(DsoHandle* handle, const char* jvm_dll_path = nullptr, const char* java_home_path = nullptr) const = 0;
+  virtual DsoHandle* loadLibrary(DsoHandle* handle, const char* path) const = 0;
 
   virtual int getCurrentPid() const = 0;
   virtual int getParentPid() const = 0;

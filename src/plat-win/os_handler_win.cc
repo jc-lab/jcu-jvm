@@ -7,6 +7,7 @@
  *            of the Apache License 2.0.  See the LICENSE file for details.
  */
 
+#include <list>
 #include <vector>
 #include <windows.h>
 #include <tlhelp32.h>
@@ -25,6 +26,8 @@ class DsoHandleWin : public DsoHandle {
   std::string error_;
   std::string path_;
 
+  std::list<PointerRef<DsoHandle>> dependencies_;
+
  public:
   DsoHandleWin()
       : handle_(nullptr), errno_(0) {
@@ -32,6 +35,10 @@ class DsoHandleWin : public DsoHandle {
 
   ~DsoHandleWin() override {
     close();
+  }
+
+  void addDependency(PointerRef<DsoHandle>&& handle) override {
+    dependencies_.emplace_back(std::move(handle));
   }
 
   bool isLoaded() const override {
@@ -105,7 +112,7 @@ class OsHandleWin : public OsHandler {
     return new DsoHandleWin();
   }
 
-  static int loadJvmFromJavaHome(DsoHandleWin *dso_handle, const TCHAR *java_home_path) {
+  static std::basic_string<TCHAR> findJvmFromJavaHome(const TCHAR *java_home_path) {
     TCHAR temp_path[MAX_PATH];
     size_t java_home_len = _tcslen(java_home_path);
     int rc;
@@ -114,50 +121,75 @@ class OsHandleWin : public OsHandler {
       temp_path[--java_home_len] = 0;
     }
     _tcscat_s(temp_path, _T("\\bin\\server\\jvm.dll"));
-    if ((rc = dso_handle->opent(temp_path)) == 0) {
-      return 0;
+    if (::GetFileAttributes(temp_path) != INVALID_FILE_ATTRIBUTES) {
+      return temp_path;
     }
 
     temp_path[java_home_len] = 0;
     _tcscat_s(temp_path, _T("\\jre\\bin\\server\\jvm.dll"));
-    if ((rc = dso_handle->opent(temp_path)) == 0) {
-      return 0;
+    if (::GetFileAttributes(temp_path) != INVALID_FILE_ATTRIBUTES) {
+      return temp_path;
     }
 
-    return rc;
+    return "";
   }
 
-  static int loadJvmLibraryImpl(DsoHandleWin *dso_handle, const char *jvm_dll_path, const char *java_home_path) {
+  JvmLibraryPathInfo findJvmLibrary(const char* jvm_dll_path, const char* java_home_path) const {
+    JvmLibraryPathInfo info;
+
     auto jvm_dll_path_string = intl::utf8ToSystem(jvm_dll_path);
+    std::basic_string<TCHAR> jsig_dll_path_string;
     auto java_home_path_string = intl::utf8ToSystem(java_home_path);
 
-    if (!jvm_dll_path_string.empty()) {
-      return dso_handle->opent(jvm_dll_path_string.c_str());
-    } else if (!java_home_path_string.empty()) {
-      return loadJvmFromJavaHome(dso_handle, java_home_path_string.c_str());
-    } else {
-      TCHAR env_java_home[MAX_PATH];
-      if (::GetEnvironmentVariable(_T("JAVA_HOME"), env_java_home, MAX_PATH) > 0) {
-        if (loadJvmFromJavaHome(dso_handle, env_java_home) == 0) {
-          return 0;
+    if (jvm_dll_path_string.empty()) {
+      if (!java_home_path_string.empty()) {
+        jvm_dll_path_string = findJvmFromJavaHome(info.java_home.c_str());
+      } else {
+        TCHAR env_java_home[MAX_PATH];
+        if (::GetEnvironmentVariable(_T("JAVA_HOME"), env_java_home, MAX_PATH)) {
+          java_home_path_string = env_java_home;
+          jvm_dll_path_string = findJvmFromJavaHome(env_java_home);
         }
       }
     }
 
-    return dso_handle->opent(_T("jvm.dll"));
+    if (jvm_dll_path_string.empty()) {
+      jvm_dll_path_string = _T("jvm.dll");
+    }
+
+    std::string expect_dir(info.jvm_path);
+    for (int trycount = 0; trycount < 2; trycount++) {
+      const char* last_slash = _tcsrchr(expect_dir.c_str(), _T('\\'));
+      if (!last_slash) {
+        last_slash = _tcsrchr(expect_dir.c_str(), _T('/'));
+      }
+      if (last_slash) {
+        expect_dir = std::basic_string<TCHAR>(expect_dir.c_str(), last_slash);
+        std::string temp(expect_dir);
+        temp.append(_T("\\jsig.dll"));
+        if (::GetFileAttributes(temp.c_str()) != INVALID_FILE_ATTRIBUTES) {
+          jsig_dll_path_string = temp;
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+    if (jsig_dll_path_string.empty()) {
+      jsig_dll_path_string = _T("libjsig.so");
+    }
+
+    info.jvm_path = intl::systemToUtf8(jvm_dll_path_string.c_str(), jvm_dll_path_string.length());
+    info.jsig_path = intl::systemToUtf8(jsig_dll_path_string.c_str(), jsig_dll_path_string.length());
+    info.java_home = intl::systemToUtf8(java_home_path_string.c_str(), java_home_path_string.length());
+
+    return std::move(info);
   }
 
-  DsoHandle *loadJvmLibrary(DsoHandle *handle, const char *jvm_dll_path, const char *java_home_path) const override {
-    DsoHandleWin *handle_impl;
-    if (!handle) {
-      handle_impl = new DsoHandleWin();
-      handle = handle_impl;
-    } else {
-      handle_impl = dynamic_cast<DsoHandleWin *>(handle);
-      if (handle_impl == nullptr)
-        return nullptr;
-    }
-    loadJvmLibraryImpl(handle_impl, jvm_dll_path, java_home_path);
+  DsoHandle* loadLibrary(DsoHandle* handle, const char* path) const override {
+    if (!handle)
+      handle = new DsoHandleWin();
+    handle->open(path);
     return handle;
   }
 

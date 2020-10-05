@@ -7,6 +7,9 @@
  *            of the Apache License 2.0.  See the LICENSE file for details.
  */
 
+#include <list>
+#include <cstring>
+
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
@@ -29,6 +32,8 @@ class DsoHandleUnix : public DsoHandle {
   std::string error_;
   std::string path_;
 
+  std::list<PointerRef<DsoHandle>> dependencies_;
+
  public:
   DsoHandleUnix()
   : handle_(nullptr), errno_(0)
@@ -37,6 +42,10 @@ class DsoHandleUnix : public DsoHandle {
 
   ~DsoHandleUnix() override {
     close();
+  }
+
+  void addDependency(PointerRef<DsoHandle>&& handle) override {
+    dependencies_.emplace_back(std::move(handle));
   }
 
   int open(const char *path) override {
@@ -95,44 +104,71 @@ class OsHandleUnix : public OsHandler {
     return new DsoHandleUnix();
   }
 
-  static int loadJvmFromJavaHome(DsoHandle* dso_handle, const char* java_home_path) {
+  static std::string findJvmFromJavaHome(const char* java_home_path) {
     for(char* const * it = INTL_CFUNC(location_jvm_default); *it != nullptr; it++) {
       struct stat st = { 0 };
       std::string item(*it);
       item = intl::stringReplace<char>(item, "JAVA_HOME", java_home_path);
       if (stat(item.c_str(), &st) == 0) {
-        if (dso_handle->open(item.c_str()) == 0) {
-          return 0;
+        return item;
+      }
+    }
+    return "";
+  }
+
+  JvmLibraryPathInfo findJvmLibrary(const char* jvm_dll_path, const char* java_home_path) const {
+    JvmLibraryPathInfo info;
+
+    if (jvm_dll_path) {
+      info.jvm_path = jvm_dll_path;
+    }
+    if (java_home_path) {
+      info.java_home = java_home_path;
+    }
+
+    if (info.jvm_path.empty()) {
+      if (!info.java_home.empty()) {
+        info.jvm_path = findJvmFromJavaHome(info.java_home.c_str());
+      } else {
+        const char* env_java_home = getenv("JAVA_HOME");
+        if (env_java_home) {
+          info.java_home = env_java_home;
+          info.jvm_path = findJvmFromJavaHome(env_java_home);
         }
       }
     }
-    return dso_handle->getErrno();
-  }
 
-  static int loadJvm(DsoHandle* dso_handle, const char* jvm_dll_path, const char* java_home_path) {
-    auto jvm_dll_path_string = intl::utf8ToSystem(jvm_dll_path);
-    auto java_home_path_string = intl::utf8ToSystem(java_home_path);
-
-    if (!jvm_dll_path_string.empty()) {
-      return dso_handle->open(jvm_dll_path_string.c_str());
-    } else if (!java_home_path_string.empty()) {
-      return loadJvmFromJavaHome(dso_handle, java_home_path_string.c_str());
-    } else {
-      const char* env_java_home = getenv("JAVA_HOME");
-      if (env_java_home) {
-        if (loadJvmFromJavaHome(dso_handle, env_java_home) == 0) {
-          return 0;
-        }
-      }
+    if (info.jvm_path.empty()) {
+      info.jvm_path = "libjvm.so";
     }
 
-    return dso_handle->open("libjvm.so");
+    std::string expect_dir(info.jvm_path);
+    for (int trycount = 0; trycount < 2; trycount++) {
+      struct stat st = { 0 };
+      const char* last_slash = std::strrchr(expect_dir.c_str(), '/');
+      if (last_slash) {
+        expect_dir = std::string(expect_dir.c_str(), last_slash);
+        std::string temp(expect_dir);
+        temp.append("/libjsig.so");
+        if (::stat(temp.c_str(), &st) == 0) {
+          info.jsig_path = temp;
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+    if (info.jsig_path.empty()) {
+      info.jsig_path = "libjsig.so";
+    }
+
+    return std::move(info);
   }
 
-  DsoHandle *loadJvmLibrary(DsoHandle *handle, const char *jvm_dll_path, const char *java_home_path) const override {
+  DsoHandle* loadLibrary(DsoHandle* handle, const char* path) const override {
     if (!handle)
       handle = new DsoHandleUnix();
-    loadJvm(handle, jvm_dll_path, java_home_path);
+    handle->open(path);
     return handle;
   }
 

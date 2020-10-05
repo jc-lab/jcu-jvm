@@ -45,7 +45,7 @@ class JvmLibrary {
   virtual jint JNI_GetCreatedJavaVMs(JavaVM **p_vm, jsize bufLen, jsize *nVMs) const = 0;
   virtual void JVM_DumpAllStacks(JNIEnv *env, jclass cls) const = 0;
 
-  virtual int load(const char* jvm_dll_path = nullptr, const char* java_home_path = nullptr) = 0;
+  virtual int load(const JvmLibraryPathInfo& path_info, bool jsig_load = false) = 0;
 
   static JvmLibrary* create(PointerRef<OsHandler> os_handler);
 };
