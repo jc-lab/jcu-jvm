@@ -131,7 +131,7 @@ class OsHandleWin : public OsHandler {
       return temp_path;
     }
 
-    return "";
+    return _T("");
   }
 
   JvmLibraryPathInfo findJvmLibrary(const char* jvm_dll_path, const char* java_home_path) const {
@@ -143,7 +143,7 @@ class OsHandleWin : public OsHandler {
 
     if (jvm_dll_path_string.empty()) {
       if (!java_home_path_string.empty()) {
-        jvm_dll_path_string = findJvmFromJavaHome(info.java_home.c_str());
+        jvm_dll_path_string = findJvmFromJavaHome(java_home_path_string.c_str());
       } else {
         TCHAR env_java_home[MAX_PATH];
         if (::GetEnvironmentVariable(_T("JAVA_HOME"), env_java_home, MAX_PATH)) {
@@ -157,15 +157,15 @@ class OsHandleWin : public OsHandler {
       jvm_dll_path_string = _T("jvm.dll");
     }
 
-    std::string expect_dir(info.jvm_path);
+    std::basic_string<TCHAR> expect_dir(jvm_dll_path_string);
     for (int trycount = 0; trycount < 2; trycount++) {
-      const char* last_slash = _tcsrchr(expect_dir.c_str(), _T('\\'));
+      const TCHAR* last_slash = _tcsrchr(expect_dir.c_str(), _T('\\'));
       if (!last_slash) {
         last_slash = _tcsrchr(expect_dir.c_str(), _T('/'));
       }
       if (last_slash) {
         expect_dir = std::basic_string<TCHAR>(expect_dir.c_str(), last_slash);
-        std::string temp(expect_dir);
+        std::basic_string<TCHAR> temp(expect_dir);
         temp.append(_T("\\jsig.dll"));
         if (::GetFileAttributes(temp.c_str()) != INVALID_FILE_ATTRIBUTES) {
           jsig_dll_path_string = temp;
