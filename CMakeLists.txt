@@ -5,21 +5,6 @@ set(JAVA_AWT_LIBRARY NotNeeded)
 set(JAVA_AWT_INCLUDE_PATH NotNeeded)
 find_package(JNI REQUIRED)
 
-set(JCU_JVM_USE_JSIG yes)
-if (JCU_JVM_USE_JSIG)
-    find_library(JAVA_JSIG_LIBRARY
-            NAMES
-                jsig
-            PATHS
-                ${JAVA_JVM_LIBRARY_DIRECTORIES}
-            )
-    if (JAVA_JSIG_LIBRARY)
-        list(APPEND JNI_LIBRARIES ${JAVA_JSIG_LIBRARY})
-    endif()
-endif(JCU_JVM_USE_JSIG)
-
-message("JNI_LIBRARIES = ${JNI_LIBRARIES}")
-
 string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" temp_arch)
 if (temp_arch MATCHES "(x86_64|AMD64)")
     set(HOST_CPU "i386")
