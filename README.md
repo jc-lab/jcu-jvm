@@ -32,3 +32,11 @@ int main() {
 
 # License
 Apache License Version 2.0
+
+# Points to note about licensing!
+
+OpenJDK is licensed under the "GNU General Public License, version 2, with the Classpath Exception".
+
+So jcu-jvm did not adopt GPLv2 compliant and can be under Apache License 2.0.
+
+However, if jvm.dll is dynamically linked using jcu-jvm, the program must be distributed under GPLv2.
