@@ -39,4 +39,6 @@ OpenJDK is licensed under the "GNU General Public License, version 2, with the C
 
 So jcu-jvm did not adopt GPLv2 compliant and can be under Apache License 2.0.
 
-However, if jvm.dll is dynamically linked using jcu-jvm, the program must be distributed under GPLv2.
+However, if jvm.dll is dynamically linked using jcu-jvm, the program must be distributed under "GNU General Public License, version 2, with the Classpath Exception". In this case, you do not need to disclose the source of the jar file.
+
+These words of mine have no legal effect, judge for yourself.
